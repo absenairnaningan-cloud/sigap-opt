@@ -201,6 +201,17 @@ export const api = {
     return '/api/sheets/export-csv';
   },
 
+  getExportExcelUrl(params?: { month?: string | number; year?: string | number; status?: string; commodity?: string; subdistrict?: string }): string {
+    const q = new URLSearchParams();
+    if (params?.month) q.append('month', String(params.month));
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.status) q.append('status', params.status);
+    if (params?.commodity) q.append('commodity', params.commodity);
+    if (params?.subdistrict) q.append('subdistrict', params.subdistrict);
+    const qs = q.toString();
+    return `/api/reports/export-excel${qs ? `?${qs}` : ''}`;
+  },
+
   // Stats
   async getStats(): Promise<{ success: boolean; stats: DashboardStats }> {
     const res = await fetch('/api/stats', { headers: getHeaders() });

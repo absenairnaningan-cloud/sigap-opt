@@ -11,10 +11,15 @@ import {
   Clock, 
   Database,
   ExternalLink,
-  Code2
+  Code2,
+  PlayCircle,
+  Video
 } from 'lucide-react';
 import { OPTReport, SpreadsheetConfig, SyncLog, User } from '../types/index.ts';
 import { api } from '../services/api.ts';
+import { VideoTutorialModal } from './VideoTutorialModal.tsx';
+import { AutoConnectModal } from './AutoConnectModal.tsx';
+import { Sparkles } from 'lucide-react';
 
 interface SpreadsheetSyncViewProps {
   reports: OPTReport[];
@@ -33,6 +38,8 @@ export const SpreadsheetSyncView: React.FC<SpreadsheetSyncViewProps> = ({
   const [syncMessage, setSyncMessage] = useState('');
   const [isCopiedScript, setIsCopiedScript] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showVideoTutorial, setShowVideoTutorial] = useState(false);
+  const [showAutoConnectModal, setShowAutoConnectModal] = useState(false);
   const [searchTable, setSearchTable] = useState('');
 
   const loadData = async () => {
@@ -160,12 +167,28 @@ function doPost(e) {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
+              onClick={() => setShowAutoConnectModal(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-green-300 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/30 transition active:scale-95 cursor-pointer ring-2 ring-white/30 animate-pulse"
+            >
+              <Sparkles className="w-4 h-4 fill-slate-950 text-emerald-950" />
+              <span>Hubungkan Otomatis via Email</span>
+            </button>
+
+            <button
+              onClick={() => setShowVideoTutorial(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/25 transition active:scale-95 cursor-pointer"
+            >
+              <PlayCircle className="w-4 h-4 fill-slate-950 text-amber-400" />
+              <span>Video Tutorial</span>
+            </button>
+
+            <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 disabled:opacity-70"
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 disabled:opacity-70 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}</span>
+              <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
             </button>
 
             <a
@@ -174,7 +197,7 @@ function doPost(e) {
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm border border-white/20 backdrop-blur-xs transition"
             >
               <Download className="w-4 h-4" />
-              <span>Download CSV</span>
+              <span>CSV</span>
             </a>
           </div>
         </div>
@@ -225,12 +248,22 @@ function doPost(e) {
                 {config?.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Baru saja'}
               </span>
             </p>
-            <button
-              onClick={() => setShowConfigModal(true)}
-              className="text-[11px] text-teal-700 hover:text-teal-800 font-bold underline mt-1"
-            >
-              Atur ID Google Sheet & Webhook
-            </button>
+            <div className="flex items-center space-x-2 mt-1">
+              <button
+                onClick={() => setShowAutoConnectModal(true)}
+                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center space-x-1 cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <span>Buat Otomatis via Email</span>
+              </button>
+              <span className="text-slate-300">&bull;</span>
+              <button
+                onClick={() => setShowConfigModal(true)}
+                className="text-[11px] text-slate-500 hover:text-slate-700 font-medium underline"
+              >
+                Manual ID
+              </button>
+            </div>
           </div>
           <button
             onClick={() => setShowConfigModal(true)}
@@ -369,13 +402,23 @@ function doPost(e) {
             </div>
           </div>
 
-          <button
-            onClick={handleCopyScript}
-            className="flex items-center space-x-1 px-3.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs border border-teal-200 transition"
-          >
-            {isCopiedScript ? <Check className="w-4 h-4 text-teal-600" /> : <Copy className="w-4 h-4 text-teal-600" />}
-            <span>{isCopiedScript ? 'Tersalin!' : 'Salin Skrip'}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowVideoTutorial(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300 transition cursor-pointer"
+            >
+              <PlayCircle className="w-3.5 h-3.5 text-amber-600" />
+              <span>Putar Video Tutorial</span>
+            </button>
+
+            <button
+              onClick={handleCopyScript}
+              className="flex items-center space-x-1 px-3.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs border border-teal-200 transition cursor-pointer"
+            >
+              {isCopiedScript ? <Check className="w-4 h-4 text-teal-600" /> : <Copy className="w-4 h-4 text-teal-600" />}
+              <span>{isCopiedScript ? 'Tersalin!' : 'Salin Skrip'}</span>
+            </button>
+          </div>
         </div>
 
         <div className="bg-slate-900 text-slate-300 p-4 rounded-xl text-xs font-mono max-h-48 overflow-y-auto">
@@ -472,6 +515,25 @@ function doPost(e) {
           </div>
         </div>
       )}
+      {/* MODAL VIDEO TUTORIAL INTERAKTIF */}
+      <VideoTutorialModal
+        isOpen={showVideoTutorial}
+        onClose={() => setShowVideoTutorial(false)}
+        appsScriptCode={appsScriptCode}
+      />
+
+      {/* MODAL HUBUNGKAN OTOMATIS VIA EMAIL */}
+      <AutoConnectModal
+        isOpen={showAutoConnectModal}
+        onClose={() => setShowAutoConnectModal(false)}
+        reports={reports}
+        defaultEmail={currentUser?.email || 'absenairnaningan@gmail.com'}
+        onSuccess={(updatedConfig) => {
+          setConfig(updatedConfig);
+          onRefreshReports();
+          loadData();
+        }}
+      />
     </div>
   );
 };

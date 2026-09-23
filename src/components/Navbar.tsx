@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Shield, User as UserIcon, Activity, FileSpreadsheet, MessageSquare, BookOpen, UserCheck } from 'lucide-react';
+import { LogOut, Shield, User as UserIcon, Activity, FileSpreadsheet, MessageSquare, BookOpen, UserCheck, Printer } from 'lucide-react';
 import { User } from '../types/index.ts';
 
 interface NavbarProps {
@@ -93,6 +93,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Spreadsheets</span>
+            </button>
+
+            {/* Menu Cetak Laporan Bulanan Excel */}
+            <button
+              onClick={() => setActiveTab('print')}
+              className={`px-3 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all flex items-center space-x-1.5 ${
+                activeTab === 'print'
+                  ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Printer className="w-4 h-4 text-emerald-600" />
+              <span>Cetak Laporan</span>
+              <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold uppercase">
+                Excel
+              </span>
             </button>
 
             {/* Admin Only Tab: Halaman Admin & Menu Tambah User */}
@@ -216,6 +232,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             Spreadsheets
+          </button>
+          <button
+            onClick={() => setActiveTab('print')}
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${
+              activeTab === 'print' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-600'
+            }`}
+          >
+            Cetak Laporan Excel
           </button>
           {currentUser?.role === 'admin' && (
             <button

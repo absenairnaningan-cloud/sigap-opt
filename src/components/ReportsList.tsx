@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { OPTReport, User } from '../types/index.ts';
 import { api } from '../services/api.ts';
+import { Printer } from 'lucide-react';
 
 interface ReportsListProps {
   reports: OPTReport[];
@@ -23,6 +24,7 @@ interface ReportsListProps {
   onSelectReport: (report: OPTReport) => void;
   onRefreshReports: () => void;
   isLoading: boolean;
+  onNavigateToPrint?: () => void;
 }
 
 export const ReportsList: React.FC<ReportsListProps> = ({
@@ -32,6 +34,7 @@ export const ReportsList: React.FC<ReportsListProps> = ({
   onSelectReport,
   onRefreshReports,
   isLoading,
+  onNavigateToPrint,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -90,7 +93,18 @@ export const ReportsList: React.FC<ReportsListProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigateToPrint && (
+            <button
+              onClick={onNavigateToPrint}
+              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition shadow-xs cursor-pointer"
+              title="Cetak & Unduh Laporan Rekapitulasi Excel Berdasarkan Bulan"
+            >
+              <Printer className="w-4 h-4 text-emerald-700" />
+              <span>Cetak Excel Bulanan</span>
+            </button>
+          )}
+
           <a
             href={api.getExportCsvUrl()}
             download
@@ -98,7 +112,7 @@ export const ReportsList: React.FC<ReportsListProps> = ({
             title="Download database dalam format CSV untuk Google Spreadsheets"
           >
             <Download className="w-4 h-4" />
-            <span>Ekspor Spreadsheets</span>
+            <span>Ekspor CSV</span>
           </a>
 
           <button
@@ -106,7 +120,7 @@ export const ReportsList: React.FC<ReportsListProps> = ({
             className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold shadow-md shadow-emerald-700/20 transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Laporan Pengaduan Baru</span>
+            <span>+ Laporan Baru</span>
           </button>
         </div>
       </div>

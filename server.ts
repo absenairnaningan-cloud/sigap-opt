@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import * as XLSX from 'xlsx';
 import { OPTReport, User, FonnteLog, FonnteConfig, SpreadsheetConfig, SyncLog, DashboardStats } from './src/types/index.ts';
 
 dotenv.config();
@@ -1190,6 +1191,146 @@ app.get('/api/sheets/export-csv', (_req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="SIGAP_OPT_Laporan_Spreadsheet_${new Date().toISOString().slice(0, 10)}.csv"`);
   res.send('\uFEFF' + csvContent); // Add UTF-8 BOM for Excel / Spreadsheets
+});
+
+// Export Excel (.xlsx) berdasarkan Bulan dan Tahun
+app.get('/api/reports/export-excel', (req, res) => {
+  const db = initDB();
+  const { month, year, status, commodity, subdistrict } = req.query;
+
+  let filtered = [...db.reports];
+
+  // Filter berdasarkan Tahun (contoh: 2026)
+  if (year && year !== 'all') {
+    filtered = filtered.filter(r => {
+      const d = new Date(r.dateReported);
+      return d.getFullYear().toString() === year.toString();
+    });
+  }
+
+  // Filter berdasarkan Bulan (1-12)
+  if (month && month !== 'all') {
+    filtered = filtered.filter(r => {
+      const d = new Date(r.dateReported);
+      return (d.getMonth() + 1).toString() === month.toString();
+    });
+  }
+
+  // Filter Status
+  if (status && status !== 'all') {
+    filtered = filtered.filter(r => r.status === status);
+  }
+
+  // Filter Komoditas
+  if (commodity && commodity !== 'all') {
+    filtered = filtered.filter(r => r.commodity.toLowerCase().includes((commodity as string).toLowerCase()));
+  }
+
+  // Filter Kecamatan
+  if (subdistrict && subdistrict !== 'all') {
+    filtered = filtered.filter(r => r.subdistrict.toLowerCase().includes((subdistrict as string).toLowerCase()));
+  }
+
+  const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const monthLabel = month && month !== 'all' ? monthNames[Number(month) - 1] : 'Semua-Bulan';
+  const yearLabel = year && year !== 'all' ? year.toString() : new Date().getFullYear().toString();
+
+  // Create Excel Rows Data
+  const excelData = filtered.map((r, idx) => ({
+    'No': idx + 1,
+    'No Tiket Laporan': r.code,
+    'Tanggal Lapor': new Date(r.dateReported).toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }),
+    'Nama Pelapor / Petani': r.reporterName,
+    'No WhatsApp / HP': r.reporterPhone || '-',
+    'Kelompok Tani (Poktan)': r.farmerGroup || '-',
+    'Kecamatan': r.subdistrict,
+    'Desa / Pekon': r.village,
+    'Komoditas Tanaman': r.commodity,
+    'Jenis OPT (Hama/Penyakit)': r.pestName,
+    'Kategori OPT': r.pestType,
+    'Luas Terserang (Ha)': Number(r.areaAffectedHa) || 0,
+    'Luas Terancam (Ha)': Number(r.areaThreatenedHa) || 0,
+    'Tingkat Serangan': r.severity,
+    'Umur Tanaman (Minggu)': r.plantAgeWeeks || 0,
+    'Gejala Serangan di Lapangan': r.symptoms,
+    'Status Tindakan': r.status,
+    'Petugas Verifikator': r.verifiedBy || '-',
+    'Rekomendasi Petugas (PHT)': r.recommendation || '-',
+    'Tindakan Gerakan Pengendalian (Gerdal)': r.actionTaken || '-',
+    'Kanal Laporan': r.source === 'fonnte_whatsapp' ? 'Chatbot WA Fonnte' : 'Portal Web'
+  }));
+
+  // Create Workbook
+  const workbook = XLSX.utils.book_new();
+
+  // 1. Sheet Utama Laporan
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+  // Set Column Widths for readability in MS Excel
+  worksheet['!cols'] = [
+    { wch: 6 },  // No
+    { wch: 18 }, // No Tiket
+    { wch: 14 }, // Tanggal
+    { wch: 24 }, // Nama
+    { wch: 16 }, // HP
+    { wch: 24 }, // Poktan
+    { wch: 18 }, // Kecamatan
+    { wch: 18 }, // Desa
+    { wch: 16 }, // Komoditas
+    { wch: 26 }, // OPT
+    { wch: 14 }, // Kategori
+    { wch: 18 }, // Terserang
+    { wch: 18 }, // Terancam
+    { wch: 16 }, // Tingkat
+    { wch: 20 }, // Umur
+    { wch: 35 }, // Gejala
+    { wch: 22 }, // Status
+    { wch: 22 }, // Petugas
+    { wch: 35 }, // Rekomendasi
+    { wch: 35 }, // Tindakan
+    { wch: 18 }  // Kanal
+  ];
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, `Laporan_${monthLabel.slice(0, 3)}_${yearLabel}`);
+
+  // 2. Sheet Ringkasan Rekapitulasi (Statistik Eksekutif Dinas)
+  const totalReports = filtered.length;
+  const totalLuasTerserang = filtered.reduce((acc, curr) => acc + (Number(curr.areaAffectedHa) || 0), 0);
+  const totalLuasTerancam = filtered.reduce((acc, curr) => acc + (Number(curr.areaThreatenedHa) || 0), 0);
+
+  const summaryData = [
+    { 'Parameter Rekapitulasi': 'Periode Laporan', 'Nilai': `${monthLabel} ${yearLabel}` },
+    { 'Parameter Rekapitulasi': 'Total Pengaduan OPT', 'Nilai': `${totalReports} Laporan` },
+    { 'Parameter Rekapitulasi': 'Total Luas Terserang', 'Nilai': `${totalLuasTerserang.toFixed(2)} Hektar (Ha)` },
+    { 'Parameter Rekapitulasi': 'Total Luas Terancam', 'Nilai': `${totalLuasTerancam.toFixed(2)} Hektar (Ha)` },
+    { 'Parameter Rekapitulasi': 'Status Selesai / Terkendali', 'Nilai': `${filtered.filter(r => r.status === 'Selesai').length} Laporan` },
+    { 'Parameter Rekapitulasi': 'Status Gerdal / Tindak Lanjut', 'Nilai': `${filtered.filter(r => r.status === 'Tindak Lanjut / Gerdal').length} Laporan` },
+    { 'Parameter Rekapitulasi': 'Status Menunggu Verifikasi', 'Nilai': `${filtered.filter(r => r.status === 'Menunggu Verifikasi').length} Laporan` },
+    { 'Parameter Rekapitulasi': 'Tanggal Cetak File', 'Nilai': new Date().toLocaleString('id-ID') },
+    { 'Parameter Rekapitulasi': 'Instansi Penerbit', 'Nilai': 'Dinas Pertanian Kabupaten Tanggamus - SIGAP-OPT' }
+  ];
+
+  const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+  summaryWorksheet['!cols'] = [{ wch: 35 }, { wch: 45 }];
+  XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Ringkasan_Rekap_Dinas');
+
+  // Generate buffer
+  const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  const safeFilename = `Laporan_Bulanan_OPT_${monthLabel}_${yearLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+  res.setHeader('Content-Length', excelBuffer.length);
+  res.send(excelBuffer);
 });
 
 // 8. DASHBOARD ANALYTICS STATS

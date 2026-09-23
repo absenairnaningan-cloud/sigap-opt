@@ -5,6 +5,7 @@ import { ReportsList } from './components/ReportsList.tsx';
 import { AdminUserManagement } from './components/AdminUserManagement.tsx';
 import { FonnteBotHub } from './components/FonnteBotHub.tsx';
 import { SpreadsheetSyncView } from './components/SpreadsheetSyncView.tsx';
+import { MonthlyPrintReportView } from './components/MonthlyPrintReportView.tsx';
 import { OPTKnowledgeBase } from './components/OPTKnowledgeBase.tsx';
 import { LoginPage } from './components/LoginPage.tsx';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal.tsx';
@@ -157,6 +158,7 @@ export default function App() {
             onSelectReport={(report) => setSelectedReport(report)}
             onRefreshReports={refreshReports}
             isLoading={isLoading}
+            onNavigateToPrint={() => setActiveTab('print')}
           />
         )}
 
@@ -172,6 +174,13 @@ export default function App() {
             reports={reports}
             currentUser={currentUser}
             onRefreshReports={refreshReports}
+          />
+        )}
+
+        {activeTab === 'print' && (
+          <MonthlyPrintReportView
+            reports={reports}
+            currentUser={currentUser}
           />
         )}
 

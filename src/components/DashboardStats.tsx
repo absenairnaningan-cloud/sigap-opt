@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Sparkles,
   MapPin,
-  Flame
+  Flame,
+  Printer
 } from 'lucide-react';
 import { DashboardStats as StatsType, OPTReport, User } from '../types/index.ts';
 
@@ -68,20 +69,27 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
           </div>
 
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => onNavigate('print')}
+              className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/25 transition-all active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4 fill-slate-950 text-amber-400" />
+              <span>Cetak Excel Bulanan</span>
+            </button>
             <button
               onClick={onOpenNewReport}
-              className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
+              className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>+ Buat Laporan Pengaduan</span>
+              <span>+ Buat Laporan</span>
             </button>
             <button
               onClick={() => onNavigate('fonnte')}
-              className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs sm:text-sm border border-white/20 backdrop-blur-xs transition"
+              className="flex items-center space-x-2 px-3.5 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs sm:text-sm border border-white/20 backdrop-blur-xs transition"
             >
               <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>Buka Bot WA</span>
+              <span>Bot WA</span>
             </button>
           </div>
         </div>
