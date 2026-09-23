@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -1390,10 +1391,18 @@ app.get('/api/stats', (_req, res) => {
 // Vite middleware integration (Fullstack Dev & Prod)
 // -------------------------------------------------------------
 async function startServer() {
+  // Create the Node HTTP server up front so Vite's HMR WebSocket can share
+  // the same (proxied) port instead of opening its own port, which the
+  // preview proxy can't reach ("WebSocket closed without opened").
+  const server = http.createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server },
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);
@@ -1406,7 +1415,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`[SIGAP-OPT Server] running on http://0.0.0.0:${PORT}`);
   });
 }
