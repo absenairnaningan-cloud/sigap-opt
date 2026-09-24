@@ -147,6 +147,7 @@ export default function App() {
             onSelectReport={(report) => setSelectedReport(report)}
             currentUser={currentUser}
             spreadsheetSyncedCount={reports.filter(r => r.syncedToSheets).length}
+            onRefreshData={refreshReports}
           />
         )}
 

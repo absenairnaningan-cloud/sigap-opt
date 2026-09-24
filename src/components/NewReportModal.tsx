@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Send, AlertCircle, CheckCircle, MapPin, Phone, Shield, FileSpreadsheet, MessageSquare } from 'lucide-react';
-import { OPTReport, AttackSeverity } from '../types/index.ts';
+import { OPTReport, AttackSeverity, Subdistrict } from '../types/index.ts';
 import { api } from '../services/api.ts';
 
 interface NewReportModalProps {
@@ -14,6 +14,7 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
   onClose,
   onReportCreated,
 }) => {
+  const [subdistricts, setSubdistricts] = useState<Subdistrict[]>([]);
   const [formData, setFormData] = useState({
     reporterName: '',
     reporterPhone: '',
@@ -34,6 +35,16 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      api.getSubdistricts().then(res => {
+        if (res.success && res.subdistricts) {
+          setSubdistricts(res.subdistricts);
+        }
+      }).catch(console.error);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -186,11 +197,17 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
               <input
                 type="text"
                 required
+                list="registered-subdistricts-list"
                 value={formData.subdistrict}
                 onChange={(e) => setFormData({ ...formData, subdistrict: e.target.value })}
-                placeholder="e.g. Cimanuk"
+                placeholder="Pilih atau ketik Kecamatan..."
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <datalist id="registered-subdistricts-list">
+                {subdistricts.map(s => (
+                  <option key={s.id} value={s.name} />
+                ))}
+              </datalist>
             </div>
           </div>
 

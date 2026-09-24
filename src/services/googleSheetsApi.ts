@@ -19,10 +19,11 @@ export async function createSigapSpreadsheet(
   const sheetName = 'Laporan_Pengaduan_OPT';
 
   // 1. Create Spreadsheet via Google Sheets API v4
+  // Note: We omit explicit 'locale' property so Google Sheets defaults to the user's Google Account locale,
+  // avoiding 'Unsupported locale' errors (e.g. 'id_ID' is not accepted by Google Sheets API properties).
   const createPayload = {
     properties: {
       title,
-      locale: 'id_ID',
       autoRecalc: 'ON_CHANGE'
     },
     sheets: [

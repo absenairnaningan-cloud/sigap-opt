@@ -1,4 +1,4 @@
-import { User, OPTReport, FonnteConfig, FonnteLog, SpreadsheetConfig, SyncLog, DashboardStats } from '../types/index.ts';
+import { User, OPTReport, FonnteConfig, FonnteLog, SpreadsheetConfig, SyncLog, DashboardStats, Subdistrict } from '../types/index.ts';
 
 const TOKEN_KEY = 'sigap_opt_session_token';
 
@@ -215,6 +215,38 @@ export const api = {
   // Stats
   async getStats(): Promise<{ success: boolean; stats: DashboardStats }> {
     const res = await fetch('/api/stats', { headers: getHeaders() });
+    return await res.json();
+  },
+
+  // Subdistricts Management
+  async getSubdistricts(): Promise<{ success: boolean; subdistricts: Subdistrict[] }> {
+    const res = await fetch('/api/subdistricts', { headers: getHeaders() });
+    return await res.json();
+  },
+
+  async createSubdistrict(data: { name: string; coordinator?: string; targetAreaHa?: number; description?: string }): Promise<{ success: boolean; message: string; subdistrict?: Subdistrict }> {
+    const res = await fetch('/api/subdistricts', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await res.json();
+  },
+
+  async updateSubdistrict(id: string, data: { name?: string; coordinator?: string; targetAreaHa?: number; description?: string }): Promise<{ success: boolean; message: string; subdistrict?: Subdistrict }> {
+    const res = await fetch(`/api/subdistricts/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await res.json();
+  },
+
+  async deleteSubdistrict(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`/api/subdistricts/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
     return await res.json();
   }
 };

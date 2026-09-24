@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import * as XLSX from 'xlsx';
-import { OPTReport, User, FonnteLog, FonnteConfig, SpreadsheetConfig, SyncLog, DashboardStats } from './src/types/index.ts';
+import { OPTReport, User, FonnteLog, FonnteConfig, SpreadsheetConfig, SyncLog, DashboardStats, Subdistrict } from './src/types/index.ts';
 
 dotenv.config();
 
@@ -29,6 +29,7 @@ interface DatabaseSchema {
   fonnteLogs: FonnteLog[];
   spreadsheetConfig: SpreadsheetConfig;
   syncLogs: SyncLog[];
+  subdistricts?: Subdistrict[];
 }
 
 const defaultInitialData: DatabaseSchema = {
@@ -270,6 +271,14 @@ const defaultInitialData: DatabaseSchema = {
       rowsCount: 5,
       message: 'Sinkronisasi otomatis berhasil: 5 baris laporan OPT termutakhirkan di Google Spreadsheets'
     }
+  ],
+  subdistricts: [
+    { id: 'sub-1', name: 'Cimanuk', coordinator: 'Budi Santoso, S.P', targetAreaHa: 1250, description: 'Sentra padi sawah dan jagung' },
+    { id: 'sub-2', name: 'Sukaraja', coordinator: 'Budi Santoso, S.P', targetAreaHa: 980, description: 'Sentra hortikultura dan padi' },
+    { id: 'sub-3', name: 'Cibadak', coordinator: 'Dewi Lestari, A.Md', targetAreaHa: 1420, description: 'Wilayah pertanaman cabai dan sayuran' },
+    { id: 'sub-4', name: 'Caringin', coordinator: 'Dewi Lestari, A.Md', targetAreaHa: 890, description: 'Sentra tanaman jagung dan palawija' },
+    { id: 'sub-5', name: 'Parungkuda', coordinator: 'Ir. Ahmad Subagyo, M.Si', targetAreaHa: 1100, description: 'Sentra padi sawah irigasi teknis' },
+    { id: 'sub-6', name: 'Palabuhanratu', coordinator: 'Ir. Ahmad Subagyo, M.Si', targetAreaHa: 750, description: 'Kawasan pesisir dan dataran rendah' }
   ]
 };
 
@@ -284,7 +293,23 @@ function initDB(): DatabaseSchema {
   }
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.subdistricts || !Array.isArray(parsed.subdistricts) || parsed.subdistricts.length === 0) {
+      // Collect existing subdistricts from reports if any
+      const existingNames = new Set<string>();
+      (parsed.reports || []).forEach((r: any) => {
+        if (r.subdistrict) existingNames.add(r.subdistrict.trim());
+      });
+      defaultInitialData.subdistricts?.forEach(s => existingNames.add(s.name));
+      parsed.subdistricts = Array.from(existingNames).map((name, idx) => ({
+        id: `sub-${idx + 1}`,
+        name,
+        coordinator: 'Koordinator POPT',
+        targetAreaHa: 1000
+      }));
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
+    }
+    return parsed;
   } catch (err) {
     console.error('Error reading db file, resetting to default:', err);
     fs.writeFileSync(DB_FILE, JSON.stringify(defaultInitialData, null, 2), 'utf-8');
@@ -1334,6 +1359,108 @@ app.get('/api/reports/export-excel', (req, res) => {
   res.send(excelBuffer);
 });
 
+// Subdistricts Management (Kecamatan)
+app.get('/api/subdistricts', (_req, res) => {
+  const db = initDB();
+  res.json({ success: true, subdistricts: db.subdistricts || [] });
+});
+
+app.post('/api/subdistricts', (req, res) => {
+  const db = initDB();
+  const { name, coordinator, targetAreaHa, description } = req.body;
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Nama kecamatan wajib diisi' });
+  }
+
+  const trimmedName = name.trim();
+  if (!db.subdistricts) db.subdistricts = [];
+
+  const exists = db.subdistricts.some(s => s.name.toLowerCase() === trimmedName.toLowerCase());
+  if (exists) {
+    return res.status(400).json({ success: false, message: `Kecamatan "${trimmedName}" sudah terdaftar` });
+  }
+
+  const newSubdistrict: Subdistrict = {
+    id: `sub-${Date.now()}`,
+    name: trimmedName,
+    coordinator: coordinator ? coordinator.trim() : 'Petugas POPT',
+    targetAreaHa: targetAreaHa ? Number(targetAreaHa) : 1000,
+    description: description ? description.trim() : '',
+    createdAt: new Date().toISOString()
+  };
+
+  db.subdistricts.push(newSubdistrict);
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: `Kecamatan ${trimmedName} berhasil ditambahkan`,
+    subdistrict: newSubdistrict
+  });
+});
+
+app.put('/api/subdistricts/:id', (req, res) => {
+  const db = initDB();
+  const { id } = req.params;
+  const { name, coordinator, targetAreaHa, description } = req.body;
+
+  if (!db.subdistricts) db.subdistricts = [];
+  const idx = db.subdistricts.findIndex(s => s.id === id || s.name.toLowerCase() === id.toLowerCase());
+
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: 'Data kecamatan tidak ditemukan' });
+  }
+
+  const oldName = db.subdistricts[idx].name;
+  const updatedName = name && typeof name === 'string' && name.trim() ? name.trim() : oldName;
+
+  // If name changed, update reports referencing oldName
+  if (updatedName !== oldName) {
+    db.reports.forEach(r => {
+      if (r.subdistrict.toLowerCase() === oldName.toLowerCase()) {
+        r.subdistrict = updatedName;
+      }
+    });
+  }
+
+  db.subdistricts[idx] = {
+    ...db.subdistricts[idx],
+    name: updatedName,
+    coordinator: coordinator !== undefined ? coordinator.trim() : db.subdistricts[idx].coordinator,
+    targetAreaHa: targetAreaHa !== undefined ? Number(targetAreaHa) : db.subdistricts[idx].targetAreaHa,
+    description: description !== undefined ? description.trim() : db.subdistricts[idx].description
+  };
+
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: `Kecamatan ${updatedName} berhasil diperbarui`,
+    subdistrict: db.subdistricts[idx]
+  });
+});
+
+app.delete('/api/subdistricts/:id', (req, res) => {
+  const db = initDB();
+  const { id } = req.params;
+
+  if (!db.subdistricts) db.subdistricts = [];
+  const item = db.subdistricts.find(s => s.id === id || s.name.toLowerCase() === id.toLowerCase());
+
+  if (!item) {
+    return res.status(404).json({ success: false, message: 'Kecamatan tidak ditemukan' });
+  }
+
+  db.subdistricts = db.subdistricts.filter(s => s.id !== item.id);
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: `Kecamatan ${item.name} berhasil dihapus`
+  });
+});
+
 // 8. DASHBOARD ANALYTICS STATS
 app.get('/api/stats', (_req, res) => {
   const db = initDB();
@@ -1367,6 +1494,13 @@ app.get('/api/stats', (_req, res) => {
     .slice(0, 5);
 
   const subdistrictCounts: Record<string, number> = {};
+  
+  // Initialize with 0 for all registered subdistricts
+  (db.subdistricts || []).forEach(s => {
+    subdistrictCounts[s.name] = 0;
+  });
+
+  // Count reports for each subdistrict
   reports.forEach(r => {
     subdistrictCounts[r.subdistrict] = (subdistrictCounts[r.subdistrict] || 0) + 1;
   });
@@ -1381,7 +1515,8 @@ app.get('/api/stats', (_req, res) => {
     severityCounts: severityCounts as any,
     topPests,
     recentReports: reports.slice(0, 5),
-    subdistrictCounts
+    subdistrictCounts,
+    subdistricts: db.subdistricts || []
   };
 
   res.json({ success: true, stats });

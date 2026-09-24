@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -12,9 +12,17 @@ import {
   Sparkles,
   MapPin,
   Flame,
-  Printer
+  Printer,
+  Edit2,
+  Plus,
+  Trash2,
+  X,
+  Check,
+  Building2,
+  MapPinned
 } from 'lucide-react';
-import { DashboardStats as StatsType, OPTReport, User } from '../types/index.ts';
+import { DashboardStats as StatsType, OPTReport, User, Subdistrict } from '../types/index.ts';
+import { api } from '../services/api.ts';
 
 interface DashboardStatsProps {
   stats: StatsType | null;
@@ -23,6 +31,7 @@ interface DashboardStatsProps {
   onSelectReport: (report: OPTReport) => void;
   currentUser: User | null;
   spreadsheetSyncedCount: number;
+  onRefreshData?: () => void;
 }
 
 export const DashboardStats: React.FC<DashboardStatsProps> = ({
@@ -32,7 +41,17 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
   onSelectReport,
   currentUser,
   spreadsheetSyncedCount,
+  onRefreshData,
 }) => {
+  // Modal states for managing Kecamatan
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingSubdistrict, setEditingSubdistrict] = useState<{ id?: string; name: string; coordinator?: string } | null>(null);
+  const [newSubdistrictName, setNewSubdistrictName] = useState('');
+  const [newSubdistrictCoordinator, setNewSubdistrictCoordinator] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+
   if (!stats) {
     return (
       <div className="py-12 text-center text-slate-500">
@@ -41,6 +60,84 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
       </div>
     );
   }
+
+  const handleAddSubdistrict = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubdistrictName.trim()) return;
+    setIsSubmitting(true);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const res = await api.createSubdistrict({
+        name: newSubdistrictName.trim(),
+        coordinator: newSubdistrictCoordinator.trim() || undefined
+      });
+      if (res.success) {
+        setActionSuccess(`Kecamatan ${newSubdistrictName} berhasil ditambahkan!`);
+        setNewSubdistrictName('');
+        setNewSubdistrictCoordinator('');
+        if (onRefreshData) await onRefreshData();
+        setTimeout(() => {
+          setIsAddModalOpen(false);
+          setActionSuccess('');
+        }, 1200);
+      } else {
+        setActionError(res.message || 'Gagal menambahkan kecamatan');
+      }
+    } catch {
+      setActionError('Terjadi kesalahan koneksi server');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveEditSubdistrict = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubdistrict || !editingSubdistrict.name.trim()) return;
+    setIsSubmitting(true);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const idToUpdate = editingSubdistrict.id || editingSubdistrict.name;
+      const res = await api.updateSubdistrict(idToUpdate, {
+        name: editingSubdistrict.name.trim(),
+        coordinator: editingSubdistrict.coordinator?.trim() || undefined
+      });
+      if (res.success) {
+        setActionSuccess(`Kecamatan berhasil diperbarui!`);
+        if (onRefreshData) await onRefreshData();
+        setTimeout(() => {
+          setEditingSubdistrict(null);
+          setActionSuccess('');
+        }, 1200);
+      } else {
+        setActionError(res.message || 'Gagal memperbarui kecamatan');
+      }
+    } catch {
+      setActionError('Terjadi kesalahan koneksi server');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubdistrict = async (subdistrictName: string) => {
+    const matched = stats.subdistricts?.find(s => s.name.toLowerCase() === subdistrictName.toLowerCase());
+    const idToDelete = matched ? matched.id : subdistrictName;
+    if (!confirm(`Hapus Kecamatan "${subdistrictName}" dari sistem sebaran wilayah?`)) return;
+
+    try {
+      const res = await api.deleteSubdistrict(idToDelete);
+      if (res.success) {
+        if (onRefreshData) await onRefreshData();
+      } else {
+        alert(res.message || 'Gagal menghapus kecamatan');
+      }
+    } catch {
+      alert('Gagal menghubungi server');
+    }
+  };
 
   const severityTotal = (stats.severityCounts.Ringan || 0) + 
                         (stats.severityCounts.Sedang || 0) + 
@@ -322,38 +419,275 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
 
         {/* Wilayah Sebaran Kecamatan */}
         <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center space-x-2">
               <h2 className="text-sm sm:text-base font-bold text-slate-900">Sebaran Wilayah Kecamatan</h2>
-              <p className="text-xs text-slate-500">Konsentrasi laporan pengaduan</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                {Object.keys(stats.subdistrictCounts).length} Wilayah
+              </span>
             </div>
-            <MapPin className="w-5 h-5 text-slate-400" />
-          </div>
-
-          <div className="space-y-2 pt-1">
-            {Object.entries(stats.subdistrictCounts).map(([kec, count], idx) => (
-              <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0 text-xs">
-                <span className="font-semibold text-slate-800 flex items-center space-x-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                  <span>Kecamatan {kec}</span>
-                </span>
-                <span className="font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-                  {count} Laporan
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {currentUser?.role === 'admin' && (
+            
+            {/* Button Tambah Kecamatan (Ukuran ringkas/kecil) */}
             <button
-              onClick={() => onNavigate('users')}
-              className="w-full mt-2 py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition flex items-center justify-center space-x-1.5"
+              onClick={() => {
+                setNewSubdistrictName('');
+                setNewSubdistrictCoordinator('');
+                setActionError('');
+                setActionSuccess('');
+                setIsAddModalOpen(true);
+              }}
+              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+              title="Tambah Wilayah Kecamatan Baru"
             >
-              <span>+ Atur Petugas per Wilayah (Halaman Admin)</span>
+              <Plus className="w-3 h-3" />
+              <span>Tambah</span>
             </button>
-          )}
+          </div>
+
+          <div className="space-y-2 pt-1 max-h-[360px] overflow-y-auto pr-1">
+            {Object.entries(stats.subdistrictCounts).map(([kec, count], idx) => {
+              const subObj = stats.subdistricts?.find(s => s.name.toLowerCase() === kec.toLowerCase());
+              return (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition group"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500 shrink-0"></span>
+                    <div>
+                      <span className="font-bold text-slate-800 text-xs block">
+                        Kecamatan {kec}
+                      </span>
+                      {subObj?.coordinator && (
+                        <span className="text-[10px] text-slate-500 block">
+                          Petugas: {subObj.coordinator}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-teal-700 bg-white px-2 py-0.5 rounded-full border border-teal-200 text-[11px] shadow-2xs">
+                      {count} Laporan
+                    </span>
+
+                    {/* Button Edit Kecamatan */}
+                    <button
+                      onClick={() => {
+                        setEditingSubdistrict({
+                          id: subObj?.id,
+                          name: kec,
+                          coordinator: subObj?.coordinator || ''
+                        });
+                        setActionError('');
+                        setActionSuccess('');
+                      }}
+                      className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-emerald-700 hover:border-emerald-300 transition shadow-2xs cursor-pointer"
+                      title={`Edit Kecamatan ${kec}`}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+
+                    {/* Button Hapus (bila belum ada laporan) */}
+                    {count === 0 && (
+                      <button
+                        onClick={() => handleDeleteSubdistrict(kec)}
+                        className="p-1 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition shadow-2xs cursor-pointer"
+                        title={`Hapus Kecamatan ${kec}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span>
+              Total Kecamatan: <strong>{Object.keys(stats.subdistrictCounts).length}</strong>
+            </span>
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => onNavigate('users')}
+                className="text-purple-700 hover:text-purple-900 font-bold underline"
+              >
+                Atur Penugasan Petugas &rarr;
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modal Tambah Kecamatan */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <MapPinned className="w-5 h-5 text-emerald-300" />
+                <h3 className="font-bold text-sm sm:text-base">Tambah Wilayah Kecamatan Baru</h3>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-emerald-100 hover:text-white p-1 rounded-lg hover:bg-white/10 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubdistrict} className="p-5 space-y-4">
+              {actionError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{actionError}</span>
+                </div>
+              )}
+
+              {actionSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{actionSuccess}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Kecamatan <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newSubdistrictName}
+                  onChange={(e) => setNewSubdistrictName(e.target.value)}
+                  placeholder="Contoh: Air Naningan, Ulubelu, Pulau Panggung..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Kecamatan baru akan otomatis muncul pada formulir pengaduan OPT dan peta sebaran.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Petugas POPT / PPL Penanggung Jawab (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={newSubdistrictCoordinator}
+                  onChange={(e) => setNewSubdistrictCoordinator(e.target.value)}
+                  placeholder="Contoh: Budi Santoso, S.P / Koordinator Wilayah"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !newSubdistrictName.trim()}
+                  className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition active:scale-95 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Kecamatan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Kecamatan */}
+      {editingSubdistrict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-teal-700 to-slate-800 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Edit2 className="w-5 h-5 text-teal-300" />
+                <h3 className="font-bold text-sm sm:text-base">Edit Data Kecamatan</h3>
+              </div>
+              <button
+                onClick={() => setEditingSubdistrict(null)}
+                className="text-teal-100 hover:text-white p-1 rounded-lg hover:bg-white/10 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditSubdistrict} className="p-5 space-y-4">
+              {actionError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{actionError}</span>
+                </div>
+              )}
+
+              {actionSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{actionSuccess}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Kecamatan <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingSubdistrict.name}
+                  onChange={(e) => setEditingSubdistrict({ ...editingSubdistrict, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 font-semibold"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Perubahan nama kecamatan akan otomatis menyesuaikan data laporan OPT terkait.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Petugas POPT / PPL Penanggung Jawab
+                </label>
+                <input
+                  type="text"
+                  value={editingSubdistrict.coordinator || ''}
+                  onChange={(e) => setEditingSubdistrict({ ...editingSubdistrict, coordinator: e.target.value })}
+                  placeholder="Contoh: Budi Santoso, S.P"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingSubdistrict(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !editingSubdistrict.name.trim()}
+                  className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition active:scale-95 disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Recent Reports Table Preview */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">

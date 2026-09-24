@@ -91,6 +91,15 @@ export interface SyncLog {
   message: string;
 }
 
+export interface Subdistrict {
+  id: string;
+  name: string;
+  coordinator?: string;
+  targetAreaHa?: number;
+  description?: string;
+  createdAt?: string;
+}
+
 export interface DashboardStats {
   totalReports: number;
   waitingVerification: number;
@@ -102,4 +111,5 @@ export interface DashboardStats {
   topPests: { pestName: string; count: number; commodity: string }[];
   recentReports: OPTReport[];
   subdistrictCounts: Record<string, number>;
+  subdistricts?: Subdistrict[];
 }
